@@ -1,0 +1,245 @@
+<meta charset="utf-8" emacsmode="-*- markdown -*-"> <link rel="stylesheet" href="https://casual-effects.com/markdeep/latest/journal.css?">
+                       **6.08 Team 43 Final Write-Up: FDDR**
+# Overview
+Our 6.08 final project is FDDR, or Finger Dance Dance Revolution, a competitive, music-based game brought to a pocket-sized platform. The essence of the game is as follows: players press up, down, left and right buttons on their ESP32 that correspond to dance moves indicated on their LCD screens. The dance moves are represented by arrows on the screen that move in time with the beat of the selected song. FDDR has preloaded songs from multiple genres for all players to enjoy. In addition, FDDR comes with an online leaderboard, where users can compare their daily scores with other players across the world for each song. All in all, Finger Dance Dance Revolution is a fun handheld video game that can bring people together and ease our restless fingers through an online platform.
+# Game Play
+## Game Instructions
+The premise of FDDR is for a player to correctly time their button hits with the arrows appearing on the screen. To do so on our small device, players will utilize the four buttons connected on the breadboard, the left, down, up, and right buttons. Once the player selects a song from the menu, they are taken to a waiting screen on the device while the player navigates to the play button on our server. After pressing play, the screen will begin to display our game arrows, and the player then is challenged to time their button presses with the arrow reaching the bottom red line. The closer the arrow is to our red line, the more points the player receives. If the player misses the arrow, points are deducted from the score.
+## FDDR Tutorial
+The player is greeted with our main menu screen, at which point they can either click the left button to check the current FDDR leaderboard, or click the right button to play a game. When selecting songs from our game menu, use the joystick to navigate up and down through the list, before pressing the right button. Then, the player is taken to a name input screen, where they can choose their username for this round. After doing so, the game is set to be in waiting mode, until three beeps are heard from the server side. This indicates to the ESP32 that the game is now ready to be played and the music from the server will be in sync with the arrows on our device. Once the game is completed, the player is brought to the song’s current leaderboard to compare their results with other competitors. The player then has the option to play another song with the same username, or return to our main menu.
+# Functional Block Diagram of the System
+Below is the state machine diagram for our system:
+*********************************************************************************
+*                               .-------------------------------------.         *
+*                              |                                       |        *
+*                              v                                       |        *
+*            left button    .--+---.    right button                   |        *
+*            .-------------+        +----------------.                 |        *
+*           |              |  Menu  |                 |                |        *
+*           |   .--------->+        +<-----------.    |                |        *
+*           |  |            '------'              |   |                |        *
+*           |  |left button            left button|   |                |        *
+*           |  |                                  |   |                |        *
+*           v  |                                  |   v                |        *
+*         .-+--+-.                              .-+---+-.              |        *
+*        | Leader +--------------------------->+ Choose  |             |        *
+*        | Board  |  right button          .-->+  Song   |             |        *
+*        |        | && not from menu      |     '+----+-'              |        *
+*         '-+----'                        |      |    |                |        *
+*           ^                              '----'     |right button    |        *
+*           |                 joystick up/down        v                |        *
+*           |                                     .---+---.            |        *
+*           |                                    |  Enter  |           |        *
+*           |                                .-->|   Name  |           |        *
+*           |                               |     '+----+-'            |        *
+*           |               joystick up/down|      |    |              |        *
+*           |                                '----'     |right button  |        *
+*           |                                           v              |        *
+*      right|   .--------.        .-------.          .--+---.          |        *
+*     button|  | Finished |      | Playing |        |  Play  |         |        *
+*            '-+   Song   +<-----+  Song   +<-------+  Song  +--------'         *
+*               '--------'  song  '-------'   beeps  '------' beeps not heard   *
+*                           ends              heard            within 10 sec    *
+*                                                                               *
+*                                                                               *
+*********************************************************************************
+ 
+# State Machine
+Our state machine setup is designed to make the playthrough experience as simple as possible while navigating each component of it, and offering some flexibility for mishaps or missed inputs. It can be seen above. Most of the states are handled within the `statemachine` folder in `set_screen.ino`. Starting at the main menu, the user is presented with the options to move ‘left’ or ‘right’, to the entire leaderboard (not song specific) or to begin the game setup, respectively. The idea is that the user can keep pressing the right button to continue further into the game progression, which we decided was most intuitive. Off the menu, the user will choose their desired song, then enter their username, then begin to play the game once the initial beeps are heard. After the game is finished, they can pick another song and play again or return to the main menu. At nearly every stage the user can press the left button to return to the previous state or the homepage, and if the ESP32 doesn’t hear the starting beeps, it will automatically return to the menu. This state machine design was made to be as easily playable as possible while allowing for flexibility in user input and playthrough.
+ 
+## Name and Song Selection
+We implemented the scroll functionality in the CHOOSE_SONG and ENTER_NAME states. In CHOOSE_SONG, the song names are stored in a list that rotates as the joystick is moved up or down. It shows the current song in a larger text, and then the previous song above and the next song below in smaller text (wrapping around, not ending at the beginning/end). For the name, it highlights the current letter the user is on, and they can scroll up or down through the alphabet with the joystick. When they want to move on to the next letter, they can move the joystick to the right and it will highlight the next letter, starting at A again, showing that this is the letter being chosen now. When the user finishes a round and chooses another song straight from the leaderboard, the username is saved from before and they don’t have to submit their name again. 
+ 
+`````
+case ENTER_NAME:
+      set_screen(ENTER_NAME);
+      // right button pushed -> play song
+      if (right_reading != old_right_reading) {
+        if (!right_reading) { 
+          Serial.println("right button pressed, going to play song");
+          strcat(username,alphabet[alphabet_index]); // append the last letter that you chose
+          tft.fillScreen(TFT_BLACK);
+          tft.setTextColor(TFT_YELLOW);
+          tft.drawCentreString("READY FOR BEEPS",SCREEN_WIDTH/2, SCREEN_HEIGHT*2/5,2);
+          page_state = PLAY_SONG;
+          waiting_timer = millis();
+          delay(200);
+        }
+      }
+      // joystick to the right -> choose next letter
+      else if (x_reading > JOYSTICK_MAX*0.75) { 
+        Serial.println("joystick right, moving to next letter");
+        name_index++;
+        strcpy(chosen_letter,alphabet[alphabet_index]);
+        alphabet_index = 0;
+        delay(400);
+      }
+      // joystick down -> next letter in alphabet
+      else if (y_reading < JOYSTICK_MAX*0.25) { 
+        Serial.println("joystick down, choosing next letter");
+        alphabet_index = mod(alphabet_index+1, 26);
+        delay(300);
+      }
+      // joystick up -> previous letter in alphabet
+      else if (y_reading > JOYSTICK_MAX*0.75) { 
+        Serial.println("joystick up, choosing previous letter");
+        alphabet_index = mod(alphabet_index-1, 26);
+        delay(300);
+      }break;
+`````
+ 
+When a song is selected, the function getNotes() is run, which takes the song’s name as a parameter. The script runs all necessary GET requests and loads the song arrow data into the vectors to be used once the song starts. 
+ 
+## Map Arrows
+In order to draw small arrows floating down the screen as in typical Dance Dance Revolution, we used triangles! By drawing small triangles, and redrawing them lower every 25 milliseconds and covering the last one, there is an illusion that arrows are coming down the screen. At first, we used global variables to draw these triangles and ran into bugs with having multiple triangles on the screen at one time. In order to solve this, we used multiple vectors to hold the values of the current screens drawn arrows. There is a left, down, up, and right vector for each section of the screen. The values in these vectors are incremented similarly to before, and the arrows on the screen are drawn using these as corner values. If one of the values in the triangle in a vector exceeds the screen limit, it and its triangle corner partners are removed from the vector all at once to avoid messing up the amount of numbers in the vector.
+ 
+## Scoring and Hit Detection
+ 
+The same button detection used in the state machine is used to detect if one of the 4 directional buttons has been pressed. The score variable was added, and is displayed on the screen.
+ 
+There are 3 scenarios that affect the score variable: pressing a button when there isn't a corresponding arrow on screen, pressing when there is, and failing to press the button in time.
+ 
+* If a directional button is pressed and there isn't a corresponding arrow on screen, 50 points are deducted.
+* If an arrow reaches the end of the screen without a button press, 50 points are also deducted after it is removed.
+* If there is an arrow when the button is pressed, the score added is directly proportional to how close the arrow is to the end of the screen.
+ 
+After the corresponding button is pressed or the arrow reaches the end, the arrow is removed. If multiple of the same arrow are on screen during a button press, only the arrow closest to the bottom is removed.
+Only the button being pressed down will constitute a button press, not the button being held nor the button being released.
+This scheme of scoring encourages the player to only press if there is an arrow on screen, try to maximize their score by hitting as accurately as possible, but also being cautious about missing notes.
+Upon setting up the map, the score is reset to 0.
+ 
+# Integration between Arduino and Server Side
+## Database 
+The database is held on the server, called `lboard_final.db`. This database stores 4 attributes for every entry: the username, the song that was played, the score they earned, and the time at which they finished the game. This is updated via POST request each time a player finishes a game. This allows for the user to see all top scores within 24 hours via GET request to `lboard.py` (which happens from the home screen on Arduino) or top scores by specific song (which displays after a player finishes a game, as well as at the website shown above in the leaderboard section).
+Here is what `lboard_final.db` looks like:
+ 
+| username    | song     | score    | time             |
+|-------------|----------|----------|------------------|
+|FDDRISLIFE   |Rasputin  |1860      |2021-15-5 10:43:05|
+|-------------|----------|----------|------------------|
+|ILUVFDDR     |Castaways |2100      |2021-16-5 17:24:55|
+ 
+##  Music Syncing
+In order for the music on the server to sync with the game on the Arduino, we decided to use the microphone to detect a starting signal attached to the start of each song. The starting signal is three beeps at 500Hz range. In order to detect only these beeps in a system with background noise, we tried both a band pass filter and FFT to isolate sounds between 490-510Hz. 
+With this library, we got the frequency of the sounds coming into the microphone, and only made the machine respond if the peak frequency heard was between the desired range. The machine doesn’t respond to background noise, rubbing the microphone, talking, or any other frequencies in the 1-20000 Hz range.
+ 
+# Server Side
+## Homepage
+The homepage is located at http://608dev-2.net/sandbox/sc/team43/fddr/game.py. It contains a button directed to the leaderboard page and an audio player. The audio player is synced to the song that the user has selected on the Arduino. When the user enters the `Play Song` state (see state machine diagram), the Arduino posts their selected song to the server code. Then, the server code stores the song in the `current_song` database. When the homepage is refreshed, the server reads the most recent song from the database and plays its audio file modified with the three starting beeps. If the song is invalid, the audio player is grayed-out and cannot be played. 
+ 
+ 
+## Leaderboard 
+The leaderboard page is located at http://608dev-2.net/sandbox/sc/team43/fddr/leaderboard.py. It uses the database `lboard_final` populated by the Arduino as described in the Database section below. In order to display the top scorers for each song, the server code first queries for distinct songs within the database. Then, it stores in the `sql_query` dictionary the top 5 (or less, if fewer than 5 users played that song) `(user, score)` pairs for each song. Each distinct song is made into its own HTML table and displayed on the leaderboard page. The page also has a button to return to the homepage.  
+ 
+## Music Generation
+To generate music, the file is first downloaded into our library as a wav file. The file audio_editor.py to alter these wav files. First, the wav file is translated into a dictionary representation. To add the three beeps to each song, a beep sound wav file was downloaded, translated, and then repeated three times with about .25 seconds in between each sound. This new sound dictionary then gets added to the sound dictionary of the song wav file. This creates the new sound that will play on the server, which is cut off after a minute to keep gameplay in sync. 
+ 
+## Map Generation
+First, a map is generated as a txt file, which communicates the bpm of the song, as well as the relative location of each note in the song using beats. This can either be done manually, or more easily, using a script that writes the txt file. 
+The get_notes.py file will load the map into the database prior to it being loaded into the actual game. Using the file map_creator.py, the script will convert the txt file data into a list which contains each note, and the time in milliseconds before it is supposed to appear on screen. This is then put on a separate database using SQL, where it can be acquired using a GET request (because the data is very large, in order to save space, 4 requests are required. Each one will return all notes on a single lane.) When the main script enters the play state, it will run a function that does all 4 GET requests, attributed to the specific song that will be played. This makes sure that each song has a map synchronised to its bpm, and will appear as intended.
+ 
+# Documentation
+## Parts List
+We used one part for this project, this joystick & button combo (B07QQXWBCF): [https://www.amazon.com/Magic-shell-Joystick-Expansion-Keyboard/dp/B07QQXWBCF]
+We used the joystick for the scroll-through functionality on the song-choice state and the name-choice state, and we used the buttons for navigating through the pages throughout the game, as well as playing the game itself.
+ 
+# Videos
+## Week 1
+ 
+We first created a song and notes database. This database stores the beats of songs in .txt files. When a player requests a song from our system, the song’s beats are loaded. 
+ 
+<iframe width="560" height="315" src="https://www.youtube.com/embed/4RKkO03u7W0" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+ 
+Next, we needed our arrows to flow down our game screen. This creates the challenge for the players to press the buttons on time. We began with small triangle arrows, being drawn down the screen every 25 milliseconds.
+ 
+<blockquote class="tiktok-embed" cite="https://www.tiktok.com/@liv.py/video/6955914064799255813" data-video-id="6955914064799255813" style="max-width: 605px;min-width: 325px;" > <section> <a target="_blank" title="@liv.py" href="https://www.tiktok.com/@liv.py">@liv.py</a> <p>team 43 week 1 demo: generate basic game design - show how the arrows look flowing down the page! <a title="ddr" target="_blank" href="https://www.tiktok.com/tag/ddr">#ddr</a> <a title="mit" target="_blank" href="https://www.tiktok.com/tag/mit">#mit</a> <a title="arduino" target="_blank" href="https://www.tiktok.com/tag/arduino">#arduino</a></p> <a target="_blank" title="♬ Island In The Sun - Weezer" href="https://www.tiktok.com/music/Island-In-The-Sun-6826761248797886465">♬ Island In The Sun - Weezer</a> </section> </blockquote> <script async src="https://www.tiktok.com/embed.js"></script>
+ 
+After retrieving the beats from the server, we needed to translate the .txt file into map arrows to flow down the screen. In order to draw the arrows at the correct time, we made a map creator. Map creator takes the beats from a text file and puts them into the millisecond value at which they should occur on the screen. Then, we draw the arrows at that time.
+ 
+<iframe width="560" height="315" src="https://www.youtube.com/embed/DT9RsV-l1UA" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+ 
+We created an aesthetically pleasing interface to attract the player to our main menu screen and leaderboard. The main menu features a rainbow effect, making our game bright and colorful.
+ 
+<iframe width="560" height="315" src="https://www.youtube.com/embed/3oxNCreqkJg" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+ 
+Lastly, we created the beginning of our state machine. This code will eventually host the switches between states in our system. This code was the basis used to integrate our game components together and make it playable.
+ 
+![state machine demo](https://youtu.be/D7XC9hRdFGk)
+ 
+## Week 2
+ 
+The band pass signal is used by our microphone to detect when a player is ready. It listens specifically for 3 beeps to indicate when the song is beginning.
+ 
+![Demonstration of band pass signal range](https://youtu.be/GN6vJChLCEM)
+ 
+![3 beep state machine](https://youtu.be/FRDSiwgDyzM)
+ 
+In order for the player to choose a song and input their username, we used the joystick! Players can scroll up and down to select their song. Players scroll to choose the letters in their name as well, up and down to choose a letter and then to the right in order to move on to the next letter. 
+ 
+![Song and Name Scrolling Functionality](https://youtu.be/3dTKItvKIVg)
+ 
+Map creator takes a text file of a song and creates an arrow map using the beats. This arrow map can be read by our arrow code to display on the screen.
+ 
+<iframe width="560" height="315" src="https://www.youtube.com/embed/DT9RsV-l1UA" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+ 
+We edited songs to include three loud beeps in the beginning, to signal to our microphone that the player is ready. We reduced music wav files into dictionaries of their components, and were able to change the songs based off of such.
+ 
+<blockquote class="tiktok-embed" cite="https://www.tiktok.com/@liv.py/video/6958600797613608197" data-video-id="6958600797613608197" style="max-width: 605px;min-width: 325px;" > <section> <a target="_blank" title="@liv.py" href="https://www.tiktok.com/@liv.py">@liv.py</a> <p>6.08 final project week 2 milestone!! playin some music 😎 anyone have song requests? <a title="mit" target="_blank" href="https://www.tiktok.com/tag/mit">#mit</a> <a title="arduino" target="_blank" href="https://www.tiktok.com/tag/arduino">#arduino</a></p> <a target="_blank" title="♬ original sound - liv" href="https://www.tiktok.com/music/original-sound-6958600727237561093">♬ original sound - liv</a> </section> </blockquote> <script async src="https://www.tiktok.com/embed.js"></script>
+ 
+We created a leaderboard database in order to have a game wide leaderboard in the game. This database started with just the top 8 scorers of the whole game, but is now made for each song. 
+ 
+<iframe width="560" height="315" src="https://www.youtube.com/embed/_EvIXm-MiHg" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+ 
+## Week 3
+ 
+The process of integrating our entire system is started. Using our original state machine code, we started integrating all of the separate components made thus far to make one logical system.
+ 
+![Full functionality of gameplay](https://youtu.be/GlzTeUoQM08)
+ 
+To have a playable game, we needed a way to keep score. In order to score points in FDDR, one must hit the correct button corresponding to the arrow on the screen at the correct time. The closer the arrow is to the red line, the more points. If the player misses the arrow, the score decrements.
+ 
+![Apologies if the glare makes notes hard to see](https://www.youtu.be/Hx4j8nVy5PQ)
+ 
+We wanted to make the leaderboard viewable not only on the LED screen, but also on our online server. This leaderboard is in sync with the others, and simply displays its information in an aesthetically pleasing way on our page.
+ 
+![Post request demonstrating new top score and new song on the web page](https://youtu.be/_STMNjRH6Pg)
+ 
+This video demonstrates us fixing an arrow bug on our system. The game now could have multiple arrows flowing down one section of the screen at a time. It also shows the integration of our band pass filter microphone detection system with the server, which took some tweaking to get working.
+ 
+<blockquote class="tiktok-embed" cite="https://www.tiktok.com/@liv.py/video/6961248280940416262" data-video-id="6961248280940416262" style="max-width: 605px;min-width: 325px;" > <section> <a target="_blank" title="@liv.py" href="https://www.tiktok.com/@liv.py">@liv.py</a> <p>6.08 milestone 3: fddr! ready set goooo! <a title="mit" target="_blank" href="https://www.tiktok.com/tag/mit">#mit</a> <a title="arduino" target="_blank" href="https://www.tiktok.com/tag/arduino">#arduino</a></p> <a target="_blank" title="♬ original sound - liv" href="https://www.tiktok.com/music/original-sound-6961248029336800006">♬ original sound - liv</a> </section> </blockquote> <script async src="https://www.tiktok.com/embed.js"></script>
+ 
+## Week 4
+ 
+In order to automate wav to txt files, we edited our audio_editor.py file to be able to do so. The output of the function is a txt file that can be read by out get_notes.py and map_creator.py in order to work with our game system.
+ 
+<blockquote class="tiktok-embed" cite="https://www.tiktok.com/@liv.py/video/6963874226759535878" data-video-id="6963874226759535878" style="max-width: 605px;min-width: 325px;" > <section> <a target="_blank" title="@liv.py" href="https://www.tiktok.com/@liv.py">@liv.py</a> <p>6.08 milestone week 4 ~ wav to txt files for our finger dance game <a title="mit" target="_blank" href="https://www.tiktok.com/tag/mit">#mit</a> <a title="arduino" target="_blank" href="https://www.tiktok.com/tag/arduino">#arduino</a></p> <a target="_blank" title="♬ Wii Shop Channel Trap - Osrsbeatz" href="https://www.tiktok.com/music/Wii-Shop-Channel-Trap-6866382651020806146">♬ Wii Shop Channel Trap - Osrsbeatz</a> </section> </blockquote> <script async src="https://www.tiktok.com/embed.js"></script>
+ 
+In order to hold multiple distinct maps, the server's database has different tables, each of which being attributed to a unique song. When a song is selected, the getNotes function is run, with the song name as its parameter. The server then finds the corresponding data.
+ 
+![Demonstration using the maps of Sunflower and Techno](https://www.youtu.be/B4m5PMkNX-I)
+ 
+We added a 10 second timeout to our microphone detection code. This way, if the beeps aren’t heard soon enough, we head back to the main menu. If the beeps are heard within 10 seconds, the game proceeds.
+ 
+![10-second timeout](https://youtu.be/_-Z3EvPM9eA)
+ 
+We changed our band pass filter code to now use the Arduino FFT library. With this library, we got the frequency of the sounds coming into the microphone, and only made the machine respond if the peak frequency heard was between 490 and 510 Hz (since the song beep frequency is 500 Hz).
+ 
+![Mic detection](https://youtu.be/86dT2WmdnOw)
+ 
+We connected our leaderboard databases between the server and our handheld device. This way they always stay in sync and are updated globally.
+ 
+![](https://youtu.be/P8phfkfBCSc)
+ 
+We changed the length of songs playing from the full song to only being one minute. This way, the game goes by faster and there’s more of a thrill. This also helps the ESP32 and server to stay in sync and end the game at the correct time.
+ 
+<blockquote class="tiktok-embed" cite="https://www.tiktok.com/@liv.py/video/6964175561266646278" data-video-id="6964175561266646278" style="max-width: 605px;min-width: 325px;" > <section> <a target="_blank" title="@liv.py" href="https://www.tiktok.com/@liv.py">@liv.py</a> <p>6.08 final project milestone 4 pt 2! end of song calibration (calibrated with the end of the project 😢) <a title="mit" target="_blank" href="https://www.tiktok.com/tag/mit">#mit</a> <a title="arduino" target="_blank" href="https://www.tiktok.com/tag/arduino">#arduino</a></p> <a target="_blank" title="♬ original sound - liv" href="https://www.tiktok.com/music/original-sound-6964175363069037318">♬ original sound - liv</a> </section> </blockquote> <script async src="https://www.tiktok.com/embed.js"></script>
+ 
+ 
+ 
+<style class="fallback">body{visibility:hidden}</style><script>markdeepOptions={tocStyle:'medium'};</script>
+<!-- Markdeep: --><script src="https://casual-effects.com/markdeep/latest/markdeep.min.js?" charset="utf-8"></script>
+ 
+ 
+ 
+ 
+
