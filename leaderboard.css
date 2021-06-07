@@ -1,0 +1,72 @@
+#doc3 {
+    margin: auto 10px;
+    width: auto;
+    height: 2000px;
+    background-color: powderblue;
+}
+
+body {
+    background-color:powderblue;
+}
+
+h1{
+    font-size: 8rem;
+    text-align: center;
+    height:5vh;
+    line-height: 5vh;
+    color: #fcedd8;
+    font-family: 'Niconne', cursive;
+    text-shadow: 5px 5px 0px #eb452b,
+                10px 10px 0px #efa032,
+                15px 15px 0px #46b59b,
+                20px 20px 0px #017e7f,
+                25px 25px 0px #052939,
+                30px 30px 0px #c11a2b;
+}
+
+h2{
+    font-size: 3rem;
+    text-align: center;
+    height:8vh;
+    line-height: 3vh;
+    color: #fcedd8;
+    font-family: 'Niconne', cursive;
+    font-weight: bold;
+    text-shadow: 2px 2px 0px #eb452b,
+                4px 4px 0px #efa032,
+                6px 6px 0px #46b59b;
+}
+
+.left
+{
+    font-size: 2rem; 
+    color: #eb452b;
+    font-family: 'Niconne', cursive; 
+    text-align: left;
+    padding-left: 50px;
+
+}
+
+.right
+{
+    font-size: 2rem; 
+    color: #eb452b;
+    font-family: 'Niconne', cursive;
+    text-align: right;
+    padding-right: 50px;
+
+}
+
+a.button {
+    font-size: 2rem;
+    font-weight: 75;
+    line-height: 0;
+    color: #46b59b;
+    text-align: center;
+    -webkit-appearance: button;
+    -moz-appearance: button;
+    appearance: button;
+    display: inline;
+    text-decoration: none;
+    text-shadow: 1px 1px 0px #efa032;
+}
